@@ -244,12 +244,8 @@
     } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     // -------------------------------------------------------------
-    // Import the functions you need from the SDKs you need
-    import { initializeApp } from "firebase/app";
-    // TODO: Add SDKs for Firebase products that you want to use
-    // https://firebase.google.com/docs/web/setup#available-libraries
-
-    // Your web app's Firebase configuration
+    // Firebase 설정 정보 (발급받으신 본인의 정보를 넣으세요)
+    // -------------------------------------------------------------
     const firebaseConfig = {
       apiKey: "AIzaSyDCWDPFyTPv2GZVIuUs6CXfFxxNIEEXXDU",
       authDomain: "vacation-app-4fdc4.firebaseapp.com",
@@ -257,18 +253,6 @@
       storageBucket: "vacation-app-4fdc4.firebasestorage.app",
       messagingSenderId: "449859332219",
       appId: "1:449859332219:web:cade4e12ee4c87c74d5ade"
-    };
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-    // -------------------------------------------------------------
-    const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-      projectId: "YOUR_PROJECT_ID",
-      storageBucket: "YOUR_PROJECT_ID.appspot.com",
-      messagingSenderId: "YOUR_SENDER_ID",
-      appId: "YOUR_APP_ID"
     };
 
     const app = initializeApp(firebaseConfig);
