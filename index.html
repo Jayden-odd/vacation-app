@@ -45,7 +45,7 @@
         <strong>[주요 기능]</strong><br>
         • 최초 접속 시 전화번호/이름/비밀번호로 회원가입<br>
         • 직무([장비], [피킹]) 및 그룹 선택<br>
-        • 달력의 원하는 날짜 <u>우클릭</u>으로 휴가 등록/취소<br>
+        • 달력의 원하는 날짜 <u>터치(클릭)</u>로 휴가 등록/취소<br>
         • 직무별 색상 구분 ([장비]: 옅은 빨강, [피킹]: 옅은 파랑)
       </p>
       <button onclick="closeWelcomeModal()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl transition duration-200 shadow-lg">
@@ -142,7 +142,7 @@
     </div>
   </div>
 
-  <!-- 10, 11. 휴가 등록/취소 우클릭 팝업 모달 -->
+  <!-- 10, 11. 휴가 등록/취소 터치/클릭 팝업 모달 -->
   <div id="vacation-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-40 flex items-center justify-center p-4">
     <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 space-y-4">
       <h3 id="vacation-modal-date" class="text-lg font-bold border-b pb-2 text-gray-800"></h3>
@@ -309,7 +309,7 @@
       }
     }
 
-    // 2, 3. FullCalendar 생성 및 설정
+    // 2, 3, 10. FullCalendar 생성 및 설정 (터치/클릭 이벤트로 적용 완료)
     function initCalendar() {
       const calendarEl = document.getElementById('calendar');
       calendar = new FullCalendar.Calendar(calendarEl, {
@@ -322,27 +322,20 @@
         },
         height: 'auto',
         events: fetchVacations,
-        // 10. 날짜 셀 우클릭 이벤트
-        dateClick: function(info) {},
-      });
-
-      calendar.render();
-
-      // 우클릭 전용 이벤트 바인딩
-      calendarEl.addEventListener('contextmenu', function(e) {
-        e.preventDefault();
-        if (!currentUser) {
-          alert('로그인 후 휴가를 등록할 수 있습니다.');
-          openModal('login-modal');
-          return;
-        }
-        const dayCell = e.target.closest('.fc-daygrid-day');
-        if (dayCell) {
-          selectedDateStr = dayCell.getAttribute('data-date');
+        // 모바일 터치 및 PC 클릭 이벤트
+        dateClick: function(info) {
+          if (!currentUser) {
+            alert('로그인 후 휴가를 등록할 수 있습니다.');
+            openModal('login-modal');
+            return;
+          }
+          selectedDateStr = info.dateStr; // 터치/클릭한 날짜 (YYYY-MM-DD)
           document.getElementById('vacation-modal-date').innerText = `${selectedDateStr} 휴가 설정`;
           openModal('vacation-modal');
         }
       });
+
+      calendar.render();
     }
 
     // Firestore에서 휴가 정보 가져오기
