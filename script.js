@@ -20,6 +20,7 @@ const db = getFirestore(app);
 let currentUser = null; 
 let calendar = null;
 let selectedDateStr = null;
+let targetVacationDocId = null;
 
 // 모달 조작 헬퍼 함수
 function openModal(id) { document.getElementById(id)?.classList.remove('hidden'); }
@@ -36,7 +37,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // 모든 UI 이벤트 리스너 바인딩
 function bindEvents() {
-  document.getElementById('btn-close-welcome')?.addEventListener('click', () => closeModal('welcome-modal'));
   document.getElementById('btn-open-login')?.addEventListener('click', () => openModal('login-modal'));
   document.getElementById('btn-open-register')?.addEventListener('click', () => openModal('register-modal'));
   document.getElementById('btn-theme-toggle')?.addEventListener('click', toggleDarkMode);
@@ -52,13 +52,21 @@ function bindEvents() {
   document.getElementById('my-vacation-only')?.addEventListener('change', handleFilterChange);
   document.getElementById('admin-user-filter')?.addEventListener('change', handleFilterChange);
   
+  // 최고관리자용 그룹 드롭다운 변경 이벤트
+  document.getElementById('admin-group-filter')?.addEventListener('change', async () => {
+    await loadAdminUserDropdown();
+    handleFilterChange();
+  });
+  
   document.getElementById('btn-vacation-cancel')?.addEventListener('click', cancelVacation);
   document.getElementById('btn-vacation-apply')?.addEventListener('click', applyVacation);
   
   document.getElementById('mypage-form')?.addEventListener('submit', handleUpdateProfile);
   document.getElementById('btn-reset-mypw')?.addEventListener('click', resetMyPasswordToPhone);
   
+  // 그룹 생성 및 삭제 이벤트
   document.getElementById('btn-create-group')?.addEventListener('click', createGroup);
+  document.getElementById('btn-delete-group')?.addEventListener('click', deleteGroup);
 
   // 모달 닫기 버튼 공통 처리
   document.querySelectorAll('.btn-close-modal').forEach(btn => {
@@ -69,11 +77,14 @@ function bindEvents() {
   });
 }
 
-// 나이트 모드 (다크 모드) 토글 함수
+// 다크 모드 토글
 function toggleDarkMode() {
   const isDark = document.documentElement.classList.toggle('dark');
-  document.getElementById('theme-icon').innerText = isDark ? '☀️' : '🌙';
-  document.getElementById('theme-text').innerText = isDark ? '주간 모드' : '야간 모드';
+  const themeIcon = document.getElementById('theme-icon');
+  const themeText = document.getElementById('theme-text');
+  
+  if (themeIcon) themeIcon.innerText = isDark ? '☀️' : '🌙';
+  if (themeText) themeText.innerText = isDark ? '주간 모드' : '야간 모드';
 }
 
 // 세션 복구 (로컬 스토리지)
@@ -126,34 +137,110 @@ function initCalendar() {
     },
     height: 'auto',
     events: fetchVacations,
+
+    eventDidMount: function(info) {
+      info.el.style.cursor = 'pointer';
+    },
+
     dateClick: function(info) {
       if (!currentUser) {
-        alert('로그인 후 휴가를 등록할 수 있습니다.');
+        alert('로그인 후 이용할 수 있습니다.');
         openModal('login-modal');
         return;
       }
       selectedDateStr = info.dateStr;
+      targetVacationDocId = `${currentUser.id}_${selectedDateStr}`;
+      
       document.getElementById('vacation-modal-date').innerText = `${selectedDateStr} 휴가 설정`;
+      
+      const infoBox = document.getElementById('vacation-target-info');
+      if (infoBox) infoBox.classList.add('hidden');
+
+      const descBox = document.getElementById('vacation-modal-desc');
+      if (descBox) descBox.innerText = '선택하신 날짜에 휴가를 신청하거나 취소할 수 있습니다.';
+
+      const btnApply = document.getElementById('btn-vacation-apply');
+      if (btnApply) btnApply.classList.remove('hidden');
+
+      const btnCancel = document.getElementById('btn-vacation-cancel');
+      if (btnCancel) btnCancel.innerText = '내 휴가 취소';
+      
       openModal('vacation-modal');
+    },
+
+    eventClick: function(info) {
+      if (info.jsEvent) {
+        info.jsEvent.preventDefault();
+        info.jsEvent.stopPropagation();
+      }
+
+      if (!currentUser) return;
+
+      const eventId = info.event.id;
+
+      if (eventId.startsWith('work_')) {
+        alert(`[근무자] ${info.event.title}`);
+        return;
+      }
+
+      targetVacationDocId = eventId; 
+      const eventTitle = info.event.title;
+      const eventDate = info.event.startStr;
+
+      const infoBox = document.getElementById('vacation-target-info');
+      if (infoBox) {
+        infoBox.innerHTML = `<strong>등록된 휴가:</strong> ${eventTitle} (${eventDate})`;
+        infoBox.classList.remove('hidden');
+      }
+
+      document.getElementById('vacation-modal-date').innerText = `휴가 관리`;
+
+      const isManagerOrAdmin = currentUser.role === 'admin' || currentUser.role === 'manager';
+      const isMyVacation = eventId.startsWith(`${currentUser.id}_`);
+
+      if (isManagerOrAdmin || isMyVacation) {
+        const descBox = document.getElementById('vacation-modal-desc');
+        if (descBox) {
+          descBox.innerText = isManagerOrAdmin && !isMyVacation 
+            ? '관리자 권한으로 해당 사용자 휴가를 취소할 수 있습니다.' 
+            : '등록된 휴가를 취소하시겠습니까?';
+        }
+
+        const btnApply = document.getElementById('btn-vacation-apply');
+        if (btnApply) btnApply.classList.add('hidden');
+
+        const btnCancel = document.getElementById('btn-vacation-cancel');
+        if (btnCancel) {
+          btnCancel.innerText = isManagerOrAdmin && !isMyVacation ? '휴가 강제 취소' : '휴가 취소';
+          btnCancel.classList.remove('hidden');
+        }
+        
+        openModal('vacation-modal');
+      } else {
+        alert(`휴가 정보: ${eventTitle}`);
+      }
     }
   });
 
   calendar.render();
 }
 
-// 휴가 데이터 / 근무자 데이터 계산 및 로드
+// 휴가 및 근무자 데이터 로드
 async function fetchVacations(fetchInfo, successCallback, failureCallback) {
   try {
     const adminFilterVal = document.getElementById('admin-user-filter')?.value;
+    const selectedGroupVal = document.getElementById('admin-group-filter')?.value || 'ALL';
 
-    // [27번 기능 적용] 관리자/그룹관리자가 '[근무자 보기]'를 선택한 경우
+    // [근무자 보기]
     if ((currentUser?.role === 'admin' || currentUser?.role === 'manager') && adminFilterVal === 'WORKING_ONLY') {
-      
-      // 1. 사용자 목록 조회 (일반 관리자는 자기가 속한 그룹 사용자만)
       let usersQuery = collection(db, "users");
+      
       if (currentUser.role === 'manager') {
         usersQuery = query(collection(db, "users"), where("group", "==", currentUser.group));
+      } else if (currentUser.role === 'admin' && selectedGroupVal !== 'ALL') {
+        usersQuery = query(collection(db, "users"), where("group", "==", selectedGroupVal));
       }
+
       const usersSnap = await getDocs(usersQuery);
       const allUsers = [];
       usersSnap.forEach(d => {
@@ -161,27 +248,18 @@ async function fetchVacations(fetchInfo, successCallback, failureCallback) {
         allUsers.push({ id: d.id, ...u });
       });
 
-      // 2. 직무 정렬 우선순위 정의 (관리자 -> 장비 -> 피킹 순)
-      const jobOrder = {
-        '관리자': 1,
-        '장비': 2,
-        '피킹': 3
-      };
+      // 직무 정렬 순서: 관리자 -> 장비 -> 피킹
+      const jobOrder = { '관리자': 1, '장비': 2, '피킹': 3 };
 
-      // 3. 전체 휴가 목록 조회
       const vacSnap = await getDocs(collection(db, "vacations"));
       
-      // 날짜별 휴가 사용자 ID Set 생성
       const vacationDateMap = {};
       vacSnap.forEach(d => {
         const vac = d.data();
-        if (!vacationDateMap[vac.date]) {
-          vacationDateMap[vac.date] = new Set();
-        }
+        if (!vacationDateMap[vac.date]) vacationDateMap[vac.date] = new Set();
         vacationDateMap[vac.date].add(vac.userId);
       });
 
-      // 4. 달력의 현재 뷰 범위 내 날짜 계산
       let events = [];
       let cur = new Date(fetchInfo.startStr);
       const end = new Date(fetchInfo.endStr);
@@ -190,17 +268,11 @@ async function fetchVacations(fetchInfo, successCallback, failureCallback) {
         const dateStr = cur.toISOString().split('T')[0];
         const onVacationSet = vacationDateMap[dateStr] || new Set();
 
-        // 해당 날짜에 휴가가 아닌 근무자들만 추출
         const workingUsers = allUsers.filter(user => !onVacationSet.has(user.id));
+        
+        // 정렬 적용 (관리자 -> 장비 -> 피킹)
+        workingUsers.sort((a, b) => (jobOrder[a.job] || 99) - (jobOrder[b.job] || 99));
 
-        // 직무 우선순위(관리자 > 장비 > 피킹)에 따라 정렬
-        workingUsers.sort((a, b) => {
-          const orderA = jobOrder[a.job] || 99;
-          const orderB = jobOrder[b.job] || 99;
-          return orderA - orderB;
-        });
-
-        // 정렬된 순서대로 이벤트 생성
         workingUsers.forEach(user => {
           let jobClass = 'vacation-picking';
           if (user.job === '장비') jobClass = 'vacation-equipment';
@@ -208,7 +280,7 @@ async function fetchVacations(fetchInfo, successCallback, failureCallback) {
 
           events.push({
             id: `work_${user.id}_${dateStr}`,
-            title: `[${user.job}] ${user.name}`, // [직무] 이름 형태로 표기
+            title: user.name,
             start: dateStr,
             className: jobClass
           });
@@ -221,9 +293,18 @@ async function fetchVacations(fetchInfo, successCallback, failureCallback) {
       return;
     }
 
-    // 기존 휴가 표기 로직
+    // [휴가 목록]
     const querySnapshot = await getDocs(collection(db, "vacations"));
     let events = [];
+
+    let targetGroup = null;
+    if (currentUser) {
+      if (currentUser.role === 'user' || currentUser.role === 'manager') {
+        targetGroup = currentUser.group;
+      } else if (currentUser.role === 'admin' && selectedGroupVal !== 'ALL') {
+        targetGroup = selectedGroupVal;
+      }
+    }
 
     let filterTargetUserId = null;
     if (currentUser) {
@@ -233,18 +314,15 @@ async function fetchVacations(fetchInfo, successCallback, failureCallback) {
         }
       } else {
         const isMyOnly = document.getElementById('my-vacation-only')?.checked;
-        if (isMyOnly) {
-          filterTargetUserId = currentUser.id;
-        }
+        if (isMyOnly) filterTargetUserId = currentUser.id;
       }
     }
 
     querySnapshot.forEach((docSnap) => {
       const data = docSnap.data();
 
-      if (filterTargetUserId && data.userId !== filterTargetUserId) {
-        return;
-      }
+      if (targetGroup && data.group !== targetGroup) return;
+      if (filterTargetUserId && data.userId !== filterTargetUserId) return;
 
       let jobClass = 'vacation-picking';
       if (data.job === '장비') jobClass = 'vacation-equipment';
@@ -252,7 +330,7 @@ async function fetchVacations(fetchInfo, successCallback, failureCallback) {
 
       events.push({
         id: docSnap.id,
-        title: `[${data.job}] ${data.userName}`,
+        title: data.userName,
         start: data.date,
         className: jobClass
       });
@@ -269,6 +347,7 @@ function handleFilterChange() {
   if (calendar) calendar.refetchEvents();
 }
 
+// 모든 드롭다운의 그룹 목록 갱신
 async function loadGroupDropdowns() {
   try {
     const snaps = await getDocs(collection(db, "groups"));
@@ -277,26 +356,49 @@ async function loadGroupDropdowns() {
 
     const regGroupSelect = document.getElementById('reg-group');
     const myGroupSelect = document.getElementById('my-group');
+    const deleteGroupSelect = document.getElementById('delete-group-select');
     
     const optionsHtml = groups.map(g => `<option value="${g}">${g}</option>`).join('');
+    
     if (regGroupSelect) regGroupSelect.innerHTML = optionsHtml;
     if (myGroupSelect) myGroupSelect.innerHTML = optionsHtml;
+    if (deleteGroupSelect) {
+      const deletableGroups = groups.filter(g => g !== '[X]');
+      deleteGroupSelect.innerHTML = deletableGroups.length > 0 
+        ? deletableGroups.map(g => `<option value="${g}">${g}</option>`).join('')
+        : '<option value="">삭제 가능한 그룹 없음</option>';
+    }
   } catch (err) {
     console.error("그룹 로드 오류:", err);
   }
 }
 
-// 관리자용 드롭다운 초기화 ([근무자 보기] 포함)
 async function loadAdminUserDropdown() {
-  const filterSelect = document.getElementById('admin-user-filter');
-  if (!filterSelect) return;
+  const groupSelect = document.getElementById('admin-group-filter');
+  const userSelect = document.getElementById('admin-user-filter');
+  if (!userSelect) return;
 
   try {
-    let q;
     if (currentUser.role === 'admin') {
+      groupSelect.classList.remove('hidden');
+      
+      const groupsSnap = await getDocs(collection(db, "groups"));
+      let groupHtml = '<option value="ALL">전체 그룹</option>';
+      groupsSnap.forEach(g => {
+        groupHtml += `<option value="${g.data().name}">${g.data().name}</option>`;
+      });
+      groupSelect.innerHTML = groupHtml;
+    } else {
+      groupSelect.classList.add('hidden');
+    }
+
+    const selectedGroup = currentUser.role === 'admin' ? groupSelect.value : currentUser.group;
+
+    let q;
+    if (currentUser.role === 'admin' && selectedGroup === 'ALL') {
       q = query(collection(db, "users"));
     } else {
-      q = query(collection(db, "users"), where("group", "==", currentUser.group));
+      q = query(collection(db, "users"), where("group", "==", selectedGroup));
     }
 
     const snaps = await getDocs(q);
@@ -308,7 +410,7 @@ async function loadAdminUserDropdown() {
       const u = docSnap.data();
       html += `<option value="${docSnap.id}">${u.name} (${docSnap.id})</option>`;
     });
-    filterSelect.innerHTML = html;
+    userSelect.innerHTML = html;
   } catch (err) {
     console.error("사용자 드롭다운 로드 실패:", err);
   }
@@ -455,22 +557,32 @@ async function applyVacation() {
 }
 
 async function cancelVacation() {
-  if (!selectedDateStr || !currentUser) return;
+  if (!targetVacationDocId || !currentUser) return;
 
-  const docId = `${currentUser.id}_${selectedDateStr}`;
-  const vacRef = doc(db, "vacations", docId);
+  const vacRef = doc(db, "vacations", targetVacationDocId);
 
   try {
     const vacSnap = await getDoc(vacRef);
     if (!vacSnap.exists()) {
-      alert('해당 날짜에 등록된 본인의 휴가가 없습니다.');
+      alert('취소할 휴가 정보를 찾을 수 없습니다.');
       return;
     }
 
-    await deleteDoc(vacRef);
-    alert(`${selectedDateStr} 휴가가 취소되었습니다.`);
-    closeModal('vacation-modal');
-    calendar.refetchEvents();
+    const vacData = vacSnap.data();
+    const isManagerOrAdmin = currentUser.role === 'admin' || currentUser.role === 'manager';
+    const isMyVacation = vacData.userId === currentUser.id;
+
+    if (!isMyVacation && !isManagerOrAdmin) {
+      alert('다른 사용자의 휴가를 취소할 권한이 없습니다.');
+      return;
+    }
+
+    if (confirm(`[${vacData.userName}] 님의 ${vacData.date} 휴가를 취소하시겠습니까?`)) {
+      await deleteDoc(vacRef);
+      alert('휴가가 성공적으로 취소되었습니다.');
+      closeModal('vacation-modal');
+      calendar.refetchEvents();
+    }
   } catch (err) {
     alert('휴가 취소 실패: ' + err.message);
   }
@@ -541,12 +653,17 @@ async function openAdminModal() {
   }
 
   await loadAdminUserTable();
+  await loadGroupDropdowns();
   openModal('admin-modal');
 }
 
+// 새 그룹 생성
 async function createGroup() {
   const groupName = document.getElementById('new-group-name').value.trim();
-  if (!groupName) return;
+  if (!groupName) {
+    alert('생성할 그룹명을 입력하세요.');
+    return;
+  }
 
   try {
     await setDoc(doc(db, "groups", groupName), { name: groupName });
@@ -555,6 +672,73 @@ async function createGroup() {
     await loadGroupDropdowns();
   } catch (err) {
     alert('그룹 생성 실패: ' + err.message);
+  }
+}
+
+// 그룹 삭제 기능
+async function deleteGroup() {
+  const targetGroup = document.getElementById('delete-group-select').value;
+
+  if (!targetGroup) {
+    alert('삭제할 그룹을 선택해주세요.');
+    return;
+  }
+
+  if (targetGroup === '[X]') {
+    alert('[X] 그룹은 기본 이동 그룹이므로 삭제할 수 없습니다.');
+    return;
+  }
+
+  if (!confirm(`정말로 [${targetGroup}] 그룹을 삭제하시겠습니까?\n해당 그룹 소속 사용자는 모두 '[X]' 그룹으로 변경됩니다.`)) {
+    return;
+  }
+
+  try {
+    const batch = writeBatch(db);
+
+    const xGroupRef = doc(db, "groups", "[X]");
+    const xGroupSnap = await getDoc(xGroupRef);
+    if (!xGroupSnap.exists()) {
+      batch.set(xGroupRef, { name: "[X]" });
+    }
+
+    const usersQ = query(collection(db, "users"), where("group", "==", targetGroup));
+    const userSnaps = await getDocs(usersQ);
+    let affectedUserCount = 0;
+
+    userSnaps.forEach(uDoc => {
+      batch.update(uDoc.ref, { group: "[X]" });
+      affectedUserCount++;
+    });
+
+    const vacQ = query(collection(db, "vacations"), where("group", "==", targetGroup));
+    const vacSnaps = await getDocs(vacQ);
+
+    vacSnaps.forEach(vDoc => {
+      batch.update(vDoc.ref, { group: "[X]" });
+    });
+
+    const targetGroupRef = doc(db, "groups", targetGroup);
+    batch.delete(targetGroupRef);
+
+    await batch.commit();
+
+    if (currentUser.group === targetGroup) {
+      currentUser.group = "[X]";
+      localStorage.setItem('vacation_user', JSON.stringify(currentUser));
+      updateUIForLoggedInUser();
+    }
+
+    alert(`[${targetGroup}] 그룹이 삭제되었습니다.\n총 ${affectedUserCount}명의 사용자가 '[X]' 그룹으로 이동되었습니다.`);
+
+    await loadGroupDropdowns();
+    await loadAdminUserTable();
+    await loadAdminUserDropdown();
+    if (calendar) calendar.refetchEvents();
+
+  } catch (err) {
+    console.error("그룹 삭제 오류:", err);
+    alert('그룹 삭제 실패: ' + err.message);
   }
 }
 
@@ -588,19 +772,19 @@ async function loadAdminUserTable() {
         <td class="p-2 border font-medium">${u.name} (${userId})</td>
         <td class="p-2 border">${u.phone || '-'}</td>
         <td class="p-2 border">
-          <select id="job-${userId}" class="border rounded p-1 text-xs">
+          <select id="job-${userId}" class="border rounded p-1 text-xs dark:bg-gray-800 dark:text-white">
             <option value="장비" ${u.job === '장비' ? 'selected' : ''}>장비</option>
             <option value="피킹" ${u.job === '피킹' ? 'selected' : ''}>피킹</option>
             <option value="관리자" ${u.job === '관리자' ? 'selected' : ''}>관리자</option>
           </select>
         </td>
         <td class="p-2 border">
-          <select id="group-${userId}" ${currentUser.role !== 'admin' ? 'disabled' : ''} class="border rounded p-1 text-xs">
+          <select id="group-${userId}" ${currentUser.role !== 'admin' ? 'disabled' : ''} class="border rounded p-1 text-xs dark:bg-gray-800 dark:text-white">
             ${groupOptions.map(g => `<option value="${g}" ${u.group === g ? 'selected' : ''}>${g}</option>`).join('')}
           </select>
         </td>
         <td class="p-2 border">
-          <select id="role-${userId}" ${currentUser.role !== 'admin' ? 'disabled' : ''} class="border rounded p-1 text-xs">
+          <select id="role-${userId}" ${currentUser.role !== 'admin' ? 'disabled' : ''} class="border rounded p-1 text-xs dark:bg-gray-800 dark:text-white">
             <option value="user" ${u.role === 'user' ? 'selected' : ''}>일반</option>
             <option value="manager" ${u.role === 'manager' ? 'selected' : ''}>그룹 관리자</option>
             <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>최고 관리자</option>
