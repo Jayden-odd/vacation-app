@@ -16,6 +16,9 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+// 직무별 정렬 가중치 (관리자: 1 ➔ 장비: 2 ➔ 피킹: 3)
+const JOB_ORDER = { '관리자': 1, '장비': 2, '피킹': 3 };
+
 // 전역 상태
 let currentUser = null; 
 let calendar = null;
@@ -52,7 +55,7 @@ function bindEvents() {
   document.getElementById('my-vacation-only')?.addEventListener('change', handleFilterChange);
   document.getElementById('admin-user-filter')?.addEventListener('change', handleFilterChange);
   
-  // 최고관리자용 그룹 드롭다운 변경 이벤트
+  // 그룹 필터 변경 시 사용자 드롭다운 갱신 및 캘린더 리프레시
   document.getElementById('admin-group-filter')?.addEventListener('change', async () => {
     await loadAdminUserDropdown();
     handleFilterChange();
@@ -136,6 +139,7 @@ function initCalendar() {
       right: ''
     },
     height: 'auto',
+    eventOrder: 'order',
     events: fetchVacations,
 
     eventDidMount: function(info) {
@@ -231,7 +235,7 @@ async function fetchVacations(fetchInfo, successCallback, failureCallback) {
     const adminFilterVal = document.getElementById('admin-user-filter')?.value;
     const selectedGroupVal = document.getElementById('admin-group-filter')?.value || 'ALL';
 
-    // [근무자 보기]
+    // [근무자 보기 선택 시]
     if ((currentUser?.role === 'admin' || currentUser?.role === 'manager') && adminFilterVal === 'WORKING_ONLY') {
       let usersQuery = collection(db, "users");
       
@@ -247,9 +251,6 @@ async function fetchVacations(fetchInfo, successCallback, failureCallback) {
         const u = d.data();
         allUsers.push({ id: d.id, ...u });
       });
-
-      // 직무 정렬 순서: 관리자 -> 장비 -> 피킹
-      const jobOrder = { '관리자': 1, '장비': 2, '피킹': 3 };
 
       const vacSnap = await getDocs(collection(db, "vacations"));
       
@@ -270,19 +271,21 @@ async function fetchVacations(fetchInfo, successCallback, failureCallback) {
 
         const workingUsers = allUsers.filter(user => !onVacationSet.has(user.id));
         
-        // 정렬 적용 (관리자 -> 장비 -> 피킹)
-        workingUsers.sort((a, b) => (jobOrder[a.job] || 99) - (jobOrder[b.job] || 99));
+        workingUsers.sort((a, b) => (JOB_ORDER[a.job] || 99) - (JOB_ORDER[b.job] || 99));
 
         workingUsers.forEach(user => {
           let jobClass = 'vacation-picking';
-          if (user.job === '장비') jobClass = 'vacation-equipment';
-          else if (user.job === '관리자') jobClass = 'vacation-admin';
+          if (user.job === '관리자') jobClass = 'vacation-admin';
+          else if (user.job === '장비') jobClass = 'vacation-equipment';
+
+          const orderVal = JOB_ORDER[user.job] || 99;
 
           events.push({
             id: `work_${user.id}_${dateStr}`,
             title: user.name,
             start: dateStr,
-            className: jobClass
+            className: jobClass,
+            order: orderVal
           });
         });
 
@@ -293,9 +296,9 @@ async function fetchVacations(fetchInfo, successCallback, failureCallback) {
       return;
     }
 
-    // [휴가 목록]
+    // [휴가 목록 보기 시]
     const querySnapshot = await getDocs(collection(db, "vacations"));
-    let events = [];
+    let rawEvents = [];
 
     let targetGroup = null;
     if (currentUser) {
@@ -325,18 +328,24 @@ async function fetchVacations(fetchInfo, successCallback, failureCallback) {
       if (filterTargetUserId && data.userId !== filterTargetUserId) return;
 
       let jobClass = 'vacation-picking';
-      if (data.job === '장비') jobClass = 'vacation-equipment';
-      else if (data.job === '관리자') jobClass = 'vacation-admin';
+      if (data.job === '관리자') jobClass = 'vacation-admin';
+      else if (data.job === '장비') jobClass = 'vacation-equipment';
 
-      events.push({
+      const orderVal = JOB_ORDER[data.job] || 99;
+
+      rawEvents.push({
         id: docSnap.id,
         title: data.userName,
         start: data.date,
-        className: jobClass
+        className: jobClass,
+        order: orderVal,
+        job: data.job
       });
     });
 
-    successCallback(events);
+    rawEvents.sort((a, b) => a.order - b.order);
+
+    successCallback(rawEvents);
   } catch (err) {
     console.error("데이터 로드 실패:", err);
     failureCallback(err);
@@ -347,12 +356,23 @@ function handleFilterChange() {
   if (calendar) calendar.refetchEvents();
 }
 
-// 모든 드롭다운의 그룹 목록 갱신
 async function loadGroupDropdowns() {
   try {
     const snaps = await getDocs(collection(db, "groups"));
     const groups = [];
     snaps.forEach(doc => groups.push(doc.data().name));
+
+    const adminGroupSelect = document.getElementById('admin-group-filter');
+    if (adminGroupSelect) {
+      const currentSelectedVal = adminGroupSelect.value || 'ALL';
+      let adminGroupHtml = '<option value="ALL">전체 그룹</option>';
+      adminGroupHtml += groups.map(g => `<option value="${g}">${g}</option>`).join('');
+      adminGroupSelect.innerHTML = adminGroupHtml;
+      
+      if (groups.includes(currentSelectedVal) || currentSelectedVal === 'ALL') {
+        adminGroupSelect.value = currentSelectedVal;
+      }
+    }
 
     const regGroupSelect = document.getElementById('reg-group');
     const myGroupSelect = document.getElementById('my-group');
@@ -380,19 +400,12 @@ async function loadAdminUserDropdown() {
 
   try {
     if (currentUser.role === 'admin') {
-      groupSelect.classList.remove('hidden');
-      
-      const groupsSnap = await getDocs(collection(db, "groups"));
-      let groupHtml = '<option value="ALL">전체 그룹</option>';
-      groupsSnap.forEach(g => {
-        groupHtml += `<option value="${g.data().name}">${g.data().name}</option>`;
-      });
-      groupSelect.innerHTML = groupHtml;
+      groupSelect?.classList.remove('hidden');
     } else {
-      groupSelect.classList.add('hidden');
+      groupSelect?.classList.add('hidden');
     }
 
-    const selectedGroup = currentUser.role === 'admin' ? groupSelect.value : currentUser.group;
+    const selectedGroup = (currentUser.role === 'admin' && groupSelect) ? groupSelect.value : currentUser.group;
 
     let q;
     if (currentUser.role === 'admin' && selectedGroup === 'ALL') {
@@ -402,7 +415,8 @@ async function loadAdminUserDropdown() {
     }
 
     const snaps = await getDocs(q);
-    
+    const currentSelectedUser = userSelect.value || 'WORKING_ONLY';
+
     let html = '<option value="WORKING_ONLY">💼 [근무자 보기]</option>';
     html += '<option value="ALL">전체 휴가 보기</option>';
     
@@ -410,7 +424,9 @@ async function loadAdminUserDropdown() {
       const u = docSnap.data();
       html += `<option value="${docSnap.id}">${u.name} (${docSnap.id})</option>`;
     });
+
     userSelect.innerHTML = html;
+    userSelect.value = currentSelectedUser;
   } catch (err) {
     console.error("사용자 드롭다운 로드 실패:", err);
   }
@@ -464,7 +480,7 @@ async function handleLogin(e) {
 
     localStorage.setItem('vacation_user', JSON.stringify(currentUser));
 
-    updateUIForLoggedInUser();
+    await updateUIForLoggedInUser();
     closeModal('login-modal');
     alert(`${currentUser.name}님 환영합니다!`);
   } catch (err) {
@@ -506,6 +522,8 @@ async function updateUIForLoggedInUser() {
     document.getElementById('btn-open-admin').classList.remove('hidden');
     document.getElementById('admin-filter-container').classList.remove('hidden');
     document.getElementById('user-filter-container').classList.add('hidden');
+    
+    await loadGroupDropdowns();
     await loadAdminUserDropdown();
   } else {
     document.getElementById('btn-open-admin').classList.add('hidden');
@@ -617,7 +635,7 @@ async function handleUpdateProfile(e) {
     localStorage.setItem('vacation_user', JSON.stringify(currentUser));
 
     alert('정보가 수정되었습니다.');
-    updateUIForLoggedInUser();
+    await updateUIForLoggedInUser();
     closeModal('mypage-modal');
     calendar.refetchEvents();
   } catch (err) {
@@ -657,7 +675,6 @@ async function openAdminModal() {
   openModal('admin-modal');
 }
 
-// 새 그룹 생성
 async function createGroup() {
   const groupName = document.getElementById('new-group-name').value.trim();
   if (!groupName) {
@@ -675,7 +692,6 @@ async function createGroup() {
   }
 }
 
-// 그룹 삭제 기능
 async function deleteGroup() {
   const targetGroup = document.getElementById('delete-group-select').value;
 
@@ -742,6 +758,7 @@ async function deleteGroup() {
   }
 }
 
+// 사용자 목록 테이블 불러오기 (이름만 표시되도록 수정됨)
 async function loadAdminUserTable() {
   const tbody = document.getElementById('admin-user-table-body');
   tbody.innerHTML = '<tr><td colspan="6" class="text-center p-4">데이터 로딩 중...</td></tr>';
@@ -768,14 +785,15 @@ async function loadAdminUserTable() {
       const row = document.createElement('tr');
       row.className = "border-b hover:bg-gray-50 dark:hover:bg-gray-700";
 
+      // 이름만 출력하도록 `${u.name}` 적용
       row.innerHTML = `
-        <td class="p-2 border font-medium">${u.name} (${userId})</td>
+        <td class="p-2 border font-medium">${u.name}</td>
         <td class="p-2 border">${u.phone || '-'}</td>
         <td class="p-2 border">
           <select id="job-${userId}" class="border rounded p-1 text-xs dark:bg-gray-800 dark:text-white">
-            <option value="장비" ${u.job === '장비' ? 'selected' : ''}>장비</option>
-            <option value="피킹" ${u.job === '피킹' ? 'selected' : ''}>피킹</option>
-            <option value="관리자" ${u.job === '관리자' ? 'selected' : ''}>관리자</option>
+            <option value="관리자" ${u.job === '관리자' ? 'selected' : ''}>관리자 (보라색)</option>
+            <option value="장비" ${u.job === '장비' ? 'selected' : ''}>장비 (녹색)</option>
+            <option value="피킹" ${u.job === '피킹' ? 'selected' : ''}>피킹 (파란색)</option>
           </select>
         </td>
         <td class="p-2 border">
@@ -848,7 +866,7 @@ async function updateUserByAdmin(targetUserId) {
       currentUser.group = newGroup;
       currentUser.role = newRole;
       localStorage.setItem('vacation_user', JSON.stringify(currentUser));
-      updateUIForLoggedInUser();
+      await updateUIForLoggedInUser();
     }
     calendar.refetchEvents();
   } catch (err) {
