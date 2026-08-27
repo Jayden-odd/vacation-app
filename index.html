@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>휴가 관리 시스템</title>
-  
+
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -13,218 +13,226 @@
     }
   </script>
 
-  <!-- FullCalendar v6 CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+  <!-- FullCalendar CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.11/locales/ko.global.min.js"></script>
 
-  <!-- External CSS -->
-  <link rel="stylesheet" href="style.css">
+  <!-- 커스텀 스타일 -->
+  <style>
+    .fc-event-title { font-weight: 600; }
+    .vacation-picking { background-color: #3b82f6 !important; border-color: #2563eb !important; color: white !important; }
+    .vacation-equipment { background-color: #10b981 !important; border-color: #059669 !important; color: white !important; }
+    .vacation-admin { background-color: #f59e0b !important; border-color: #d97706 !important; color: white !important; }
+  </style>
 </head>
-<body class="bg-gray-100 text-gray-800 min-h-screen flex flex-col transition-colors duration-200">
 
-  <!-- 온보딩 모달 -->
-  <div id="welcome-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-8 text-center space-y-6">
-      <div class="text-blue-600 text-5xl">📅</div>
-      <h1 class="text-3xl font-extrabold text-gray-900">휴가 관리 시스템</h1>
-      <p class="text-gray-600 leading-relaxed text-sm text-left bg-gray-50 p-4 rounded-xl">
-        본 시스템은 팀원 간의 휴가 일정을 월 단위 달력으로 투명하게 공유하고 관리하기 위한 서비스입니다.<br><br>
-        <strong>[주요 기능]</strong><br>
-        • 최초 접속 시 전화번호/이름/비밀번호로 회원가입<br>
-        • 직무([장비], [피킹], [관리자]) 및 그룹 선택<br>
-        • 달력의 원하는 날짜 <u>터치(클릭)</u>로 휴가 등록/취소<br>
-        • 직무별 색상 구분 ([장비]: 빨강, [피킹]: 파랑, [관리자]: 보라)
-      </p>
-      <button id="btn-close-welcome" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl transition duration-200 shadow-lg">
-        시작하기 (로그인 / 회원가입)
-      </button>
-    </div>
-  </div>
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 min-h-screen transition-colors duration-200">
 
-  <!-- 상단 네비게이션 바 -->
-  <nav class="bg-white shadow-md border-b sticky top-0 z-30">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-      <div class="flex items-center space-x-3">
-        <span class="text-2xl">🗓️</span>
-        <span class="text-xl font-bold text-gray-900">휴가 관리 시스템</span>
+  <!-- [28번 수정] 헤더 레이아웃 (모바일 대응) -->
+  <header class="bg-white dark:bg-gray-800 shadow p-3 md:p-4">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-y-2">
+      
+      <!-- 좌측: 타이틀 -->
+      <h1 class="text-lg md:text-2xl font-bold text-gray-900 dark:text-white shrink-0">
+        휴가 관리 시스템
+      </h1>
+
+      <!-- 우측: 로그인 전 영역 -->
+      <div id="auth-buttons" class="flex items-center space-x-2">
+        <button id="btn-open-login" class="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">로그인</button>
+        <button id="btn-open-register" class="px-3 py-1.5 text-sm bg-gray-200 dark:bg-gray-700 dark:text-white rounded hover:bg-gray-300">회원가입</button>
+        <button id="btn-theme-toggle" class="p-1.5 text-sm border rounded dark:border-gray-600">
+          <span id="theme-icon">🌙</span>
+        </button>
       </div>
 
-      <div class="flex items-center space-x-3">
-        <button id="btn-theme-toggle" class="px-3 py-1.5 text-xs font-semibold rounded-lg border bg-gray-50 hover:bg-gray-100 transition">
-          <span id="theme-icon">🌙</span> <span id="theme-text">야간 모드</span>
-        </button>
-
-        <div id="auth-buttons" class="flex gap-2">
-          <button id="btn-open-login" class="px-4 py-2 text-sm font-semibold text-blue-600 hover:bg-blue-50 rounded-lg border border-blue-600 transition">로그인</button>
-          <button id="btn-open-register" class="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition">회원가입</button>
+      <!-- 우측: 로그인 후 영역 (2줄 구조) -->
+      <div id="user-menu" class="hidden flex flex-col items-end space-y-1 text-xs md:text-sm">
+        
+        <!-- 1번째 줄: 이름(직무/그룹) | 마이페이지 | 관리자 | 로그아웃 -->
+        <div class="flex items-center space-x-2">
+          <span id="user-info-text" class="font-semibold text-gray-700 dark:text-gray-200">
+            <!-- 사용자 이름 (직무/그룹) 표시 -->
+          </span>
+          <button id="btn-open-mypage" class="px-2 py-1 bg-gray-100 dark:bg-gray-700 border dark:border-gray-600 rounded hover:bg-gray-200">마이페이지</button>
+          <button id="btn-open-admin" class="hidden px-2 py-1 bg-purple-600 text-white rounded hover:bg-purple-700">관리자</button>
+          <button id="btn-logout" class="px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700">로그아웃</button>
         </div>
 
-        <div id="user-menu" class="hidden flex items-center space-x-2 sm:space-x-3">
-          <span id="user-info-text" class="text-xs sm:text-sm font-medium text-gray-700"></span>
-          <button id="btn-open-mypage" class="px-3 py-1.5 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md border transition">마이페이지</button>
+        <!-- 2번째 줄: 내 휴가만 보기 필터 | 야간모드 버튼 -->
+        <div class="flex items-center space-x-3 pt-0.5">
+          <!-- 일반 사용자 필터 -->
+          <label id="user-filter-container" class="hidden items-center cursor-pointer select-none text-gray-600 dark:text-gray-400">
+            <input type="checkbox" id="my-vacation-only" class="mr-1 rounded">
+            <span>내 휴가만 보기</span>
+          </label>
 
-          <div id="user-filter-container" class="hidden flex items-center space-x-1 bg-gray-50 px-2 py-1 rounded border">
-            <input type="checkbox" id="my-vacation-only" class="w-3.5 h-3.5 text-blue-600 rounded">
-            <label for="my-vacation-only" class="text-xs font-medium cursor-pointer select-none">내 휴가만 보기</label>
-          </div>
-
+          <!-- 관리자용 사용자 필터 드롭다운 -->
           <div id="admin-filter-container" class="hidden">
-            <select id="admin-user-filter" class="text-xs px-2 py-1.5 border rounded-md bg-gray-50 font-medium">
-              <option value="ALL">전체 사용자 보기</option>
+            <select id="admin-user-filter" class="border rounded px-1.5 py-0.5 text-xs dark:bg-gray-700 dark:border-gray-600 text-gray-900 dark:text-gray-100">
+              <!-- script.js에서 수동 옵션 동적 삽입 -->
             </select>
           </div>
 
-          <button id="btn-open-admin" class="hidden px-3 py-1.5 text-xs font-semibold text-purple-700 bg-purple-100 hover:bg-purple-200 rounded-md border border-purple-300 transition">관리자 메뉴</button>
-          <button id="btn-logout" class="px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 rounded-md transition">로그아웃</button>
+          <!-- 야간모드 버튼 -->
+          <button id="btn-theme-toggle-user" class="flex items-center space-x-1 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
+            <span id="theme-icon">🌙</span>
+            <span id="theme-text">야간모드</span>
+          </button>
         </div>
-      </div>
-    </div>
-  </nav>
 
-  <!-- 메인 달력 -->
-  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6">
-    <div class="bg-white p-4 sm:p-6 rounded-2xl shadow-md border border-gray-200">
-      <div id="calendar"></div>
+      </div>
+
     </div>
+  </header>
+
+  <!-- 메인 달력 영역 -->
+  <main class="max-w-7xl mx-auto p-2 md:p-4">
+    <div id="calendar" class="bg-white dark:bg-gray-800 p-3 md:p-6 rounded-lg shadow dark:border dark:border-gray-700"></div>
   </main>
 
-  <!-- 회원가입 모달 -->
-  <div id="register-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-40 flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
-      <h2 class="text-xl font-bold border-b pb-2">회원가입</h2>
-      <form id="register-form" class="space-y-3">
-        <div>
-          <label class="block text-xs font-semibold text-gray-600 mb-1">전화번호 (- 제외 숫자만)</label>
-          <input type="tel" id="reg-phone" required placeholder="01012345678" pattern="[0-9]+" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-gray-600 mb-1">이름</label>
-          <input type="text" id="reg-name" required placeholder="홍길동" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-gray-600 mb-1">비밀번호</label>
-          <input type="password" id="reg-password" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-gray-600 mb-1">직무 선택</label>
-          <select id="reg-job" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">
-            <option value="장비">장비</option>
-            <option value="피킹">피킹</option>
-            <option value="관리자">관리자</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-gray-600 mb-1">그룹 선택</label>
-          <select id="reg-group" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"></select>
-        </div>
-        <div class="flex justify-end space-x-2 pt-2">
-          <button type="button" data-target="register-modal" class="btn-close-modal px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">취소</button>
-          <button type="submit" class="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700">가입하기</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- 로그인 모달 -->
-  <div id="login-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-40 flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 space-y-4">
-      <h2 class="text-xl font-bold border-b pb-2">로그인</h2>
+  <!-- 모달: 로그인 -->
+  <div id="login-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+    <div class="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full p-6 space-y-4">
+      <h2 class="text-xl font-bold dark:text-white">로그인</h2>
       <form id="login-form" class="space-y-3">
         <div>
-          <label class="block text-xs font-semibold text-gray-600 mb-1">아이디 / 전화번호</label>
-          <input type="text" id="login-id" required placeholder="전화번호 또는 admin" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">
+          <label class="block text-sm font-medium dark:text-gray-300">전화번호 (- 제외)</label>
+          <input type="text" id="login-id" required class="w-full border rounded p-2 mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
         </div>
         <div>
-          <label class="block text-xs font-semibold text-gray-600 mb-1">비밀번호</label>
-          <input type="password" id="login-password" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">
+          <label class="block text-sm font-medium dark:text-gray-300">비밀번호</label>
+          <input type="password" id="login-password" required class="w-full border rounded p-2 mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
         </div>
-        <div class="flex justify-between items-center pt-2">
-          <button type="button" id="btn-reset-password-login" class="text-xs text-blue-600 hover:underline">비밀번호 초기화</button>
-          <div class="space-x-2">
-            <button type="button" data-target="login-modal" class="btn-close-modal px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">취소</button>
-            <button type="submit" class="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700">로그인</button>
-          </div>
+        <div class="flex justify-between items-center text-xs">
+          <button type="button" id="btn-reset-password-login" class="text-blue-500 hover:underline">비밀번호를 잊으셨나요?</button>
+        </div>
+        <div class="flex justify-end space-x-2 pt-2">
+          <button type="button" class="btn-close-modal px-4 py-2 border rounded dark:border-gray-600" data-target="login-modal">취소</button>
+          <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">로그인</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- 휴가 등록/취소 모달 -->
-  <div id="vacation-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-40 flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 space-y-4">
-      <h3 id="vacation-modal-date" class="text-lg font-bold border-b pb-2 text-gray-800"></h3>
-      <p class="text-sm text-gray-600">선택한 날짜에 휴가를 등록하거나 기존 등록된 휴가를 취소할 수 있습니다.</p>
-      <div class="flex justify-end space-x-2 pt-2">
-        <button type="button" data-target="vacation-modal" class="btn-close-modal px-3 py-2 text-xs text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">닫기</button>
-        <button type="button" id="btn-vacation-cancel" class="px-4 py-2 text-xs text-white bg-red-500 rounded-lg hover:bg-red-600">휴가 취소</button>
-        <button type="button" id="btn-vacation-apply" class="px-4 py-2 text-xs text-white bg-blue-600 rounded-lg hover:bg-blue-700">휴가 등록</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 마이페이지 모달 -->
-  <div id="mypage-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-40 flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
-      <h2 class="text-xl font-bold border-b pb-2">마이페이지</h2>
-      <form id="mypage-form" class="space-y-3">
+  <!-- 모달: 회원가입 -->
+  <div id="register-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+    <div class="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full p-6 space-y-4">
+      <h2 class="text-xl font-bold dark:text-white">회원가입</h2>
+      <form id="register-form" class="space-y-3">
         <div>
-          <label class="block text-xs font-semibold text-gray-600 mb-1">이름</label>
-          <input type="text" id="my-name" disabled class="w-full px-3 py-2 border rounded-lg bg-gray-100 text-sm">
+          <label class="block text-sm font-medium dark:text-gray-300">전화번호 (- 제외)</label>
+          <input type="text" id="reg-phone" required class="w-full border rounded p-2 mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
         </div>
         <div>
-          <label class="block text-xs font-semibold text-gray-600 mb-1">새 비밀번호 (변경 시에만 입력)</label>
-          <input type="password" id="my-password" placeholder="변경할 비밀번호 입력" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">
+          <label class="block text-sm font-medium dark:text-gray-300">이름</label>
+          <input type="text" id="reg-name" required class="w-full border rounded p-2 mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
         </div>
         <div>
-          <label class="block text-xs font-semibold text-gray-600 mb-1">직무 변경</label>
-          <select id="my-job" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">
+          <label class="block text-sm font-medium dark:text-gray-300">비밀번호</label>
+          <input type="password" id="reg-password" required class="w-full border rounded p-2 mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+        </div>
+        <div>
+          <label class="block text-sm font-medium dark:text-gray-300">직무</label>
+          <select id="reg-job" class="w-full border rounded p-2 mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
             <option value="장비">장비</option>
             <option value="피킹">피킹</option>
             <option value="관리자">관리자</option>
           </select>
         </div>
         <div>
-          <label class="block text-xs font-semibold text-gray-600 mb-1">그룹 변경</label>
-          <select id="my-group" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"></select>
+          <label class="block text-sm font-medium dark:text-gray-300">소속 그룹</label>
+          <select id="reg-group" class="w-full border rounded p-2 mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-white"></select>
         </div>
-        <div class="flex justify-between items-center pt-2">
-          <button type="button" id="btn-reset-mypw" class="text-xs text-red-500 hover:underline">비밀번호 초기화(전화번호로)</button>
-          <div class="space-x-2">
-            <button type="button" data-target="mypage-modal" class="btn-close-modal px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">닫기</button>
-            <button type="submit" class="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700">정보 수정</button>
-          </div>
+        <div class="flex justify-end space-x-2 pt-2">
+          <button type="button" class="btn-close-modal px-4 py-2 border rounded dark:border-gray-600" data-target="register-modal">취소</button>
+          <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">가입신청</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- 관리자 모달 -->
-  <div id="admin-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-40 flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-xl max-w-4xl w-full p-6 space-y-6 max-h-[90vh] overflow-y-auto">
-      <div class="flex justify-between items-center border-b pb-2">
-        <h2 class="text-xl font-bold">관리자 패널</h2>
-        <button type="button" data-target="admin-modal" class="btn-close-modal text-gray-500 hover:text-gray-700 text-lg">✕</button>
+  <!-- 모달: 마이페이지 -->
+  <div id="mypage-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+    <div class="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full p-6 space-y-4">
+      <h2 class="text-xl font-bold dark:text-white">내 정보 수정</h2>
+      <form id="mypage-form" class="space-y-3">
+        <div>
+          <label class="block text-sm font-medium dark:text-gray-300">이름</label>
+          <input type="text" id="my-name" disabled class="w-full border rounded p-2 mt-1 bg-gray-100 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-400">
+        </div>
+        <div>
+          <label class="block text-sm font-medium dark:text-gray-300">직무</label>
+          <select id="my-job" class="w-full border rounded p-2 mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+            <option value="장비">장비</option>
+            <option value="피킹">피킹</option>
+            <option value="관리자">관리자</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium dark:text-gray-300">소속 그룹</label>
+          <select id="my-group" class="w-full border rounded p-2 mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-white"></select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium dark:text-gray-300">새 비밀번호 (변경 시에만 입력)</label>
+          <input type="password" id="my-password" class="w-full border rounded p-2 mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="새 비밀번호">
+        </div>
+        <div class="text-right">
+          <button type="button" id="btn-reset-mypw" class="text-xs text-amber-600 dark:text-amber-400 hover:underline">비밀번호 전화번호로 초기화</button>
+        </div>
+        <div class="flex justify-end space-x-2 pt-2">
+          <button type="button" class="btn-close-modal px-4 py-2 border rounded dark:border-gray-600" data-target="mypage-modal">취소</button>
+          <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">저장</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 모달: 휴가 등록/취소 -->
+  <div id="vacation-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+    <div class="bg-white dark:bg-gray-800 rounded-lg max-w-sm w-full p-6 space-y-4">
+      <h2 id="vacation-modal-date" class="text-lg font-bold dark:text-white">휴가 설정</h2>
+      <p class="text-sm text-gray-600 dark:text-gray-300">선택하신 날짜의 휴가를 신청하거나 취소할 수 있습니다.</p>
+      <div class="flex justify-between space-x-2 pt-2">
+        <button type="button" id="btn-vacation-cancel" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 text-sm">휴가 취소</button>
+        <div class="space-x-1">
+          <button type="button" class="btn-close-modal px-3 py-2 border rounded text-sm dark:border-gray-600" data-target="vacation-modal">닫기</button>
+          <button type="button" id="btn-vacation-apply" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">휴가 신청</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 모달: 관리자 설정 -->
+  <div id="admin-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+    <div class="bg-white dark:bg-gray-800 rounded-lg max-w-3xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center border-b pb-3 dark:border-gray-700">
+        <h2 class="text-xl font-bold dark:text-white">관리자 전용 설정</h2>
+        <button type="button" class="btn-close-modal text-gray-500 hover:text-gray-700 dark:hover:text-white" data-target="admin-modal">✕</button>
       </div>
 
-      <div id="admin-group-create-sec" class="bg-purple-50 p-4 rounded-xl space-y-2 hidden">
-        <h3 class="text-sm font-bold text-purple-900">신규 그룹 생성 (admin 전용)</h3>
-        <div class="flex gap-2">
-          <input type="text" id="new-group-name" placeholder="새 그룹 이름 입력" class="flex-1 px-3 py-1.5 border rounded-lg text-sm">
-          <button type="button" id="btn-create-group" class="px-4 py-1.5 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700">그룹 추가</button>
+      <!-- 그룹 생성 섹션 -->
+      <div id="admin-group-create-sec" class="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg space-y-2">
+        <h3 class="text-sm font-semibold dark:text-white">신규 그룹 생성</h3>
+        <div class="flex space-x-2">
+          <input type="text" id="new-group-name" placeholder="그룹명 입력" class="border rounded p-1.5 text-sm flex-1 dark:bg-gray-800 dark:border-gray-600 dark:text-white">
+          <button id="btn-create-group" class="px-3 py-1.5 bg-green-600 text-white rounded text-sm hover:bg-green-700">생성</button>
         </div>
       </div>
 
-      <div class="space-y-3">
-        <h3 class="text-sm font-bold text-gray-800">사용자 관리 목록</h3>
+      <!-- 사용자 관리 목록 테이블 -->
+      <div class="space-y-2">
+        <h3 class="text-sm font-semibold dark:text-white">사용자 권한 및 직무 관리</h3>
         <div class="overflow-x-auto">
-          <table class="w-full text-left text-xs border-collapse border">
-            <thead class="bg-gray-100">
+          <table class="w-full text-left text-xs text-gray-600 dark:text-gray-300">
+            <thead class="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200">
               <tr>
-                <th class="p-2 border">이름(ID)</th>
+                <th class="p-2 border">이름(아이디)</th>
                 <th class="p-2 border">전화번호</th>
                 <th class="p-2 border">직무</th>
                 <th class="p-2 border">그룹</th>
                 <th class="p-2 border">권한</th>
-                <th class="p-2 border text-center">작업</th>
+                <th class="p-2 border text-center">관리</th>
               </tr>
             </thead>
             <tbody id="admin-user-table-body"></tbody>
@@ -234,7 +242,6 @@
     </div>
   </div>
 
-  <!-- External JS Module -->
   <script type="module" src="script.js"></script>
 </body>
 </html>
