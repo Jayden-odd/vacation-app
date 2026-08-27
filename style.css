@@ -1,0 +1,81 @@
+/* ========================================================= */
+/* 라이트 모드 (기본) 직무별 배경/테두리 색상 및 텍스트 색상 */
+/* ========================================================= */
+.vacation-equipment {
+  background-color: #fecaca !important; /* 옅은 빨간색 */
+  border-color: #fca5a5 !important;
+}
+.vacation-picking {
+  background-color: #bfdbfe !important; /* 옅은 파란색 */
+  border-color: #93c5fd !important;
+}
+.vacation-admin {
+  background-color: #e9d5ff !important; /* 옅은 보라색 */
+  border-color: #c084fc !important;
+}
+
+/* FullCalendar 이벤트 내부 텍스트 라이트 모드 강제 적용 (Black) */
+.fc-event, 
+.fc-event * {
+  color: #111827 !important; /* 라이트 모드: 검은색 */
+  font-weight: 700 !important;
+}
+
+/* FullCalendar 일요일/토요일 색상 설정 */
+.fc-day-sun a { color: #ef4444 !important; }
+.fc-day-sat a { color: #3b82f6 !important; }
+
+.fc-event {
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+/* ========================================================= */
+/* 나이트 모드 (다크 모드) 스타일 */
+/* ========================================================= */
+.dark body {
+  background-color: #0f172a;
+  color: #f8fafc;
+}
+.dark .bg-white {
+  background-color: #1e293b !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+.dark .bg-gray-50, .dark .bg-gray-100 {
+  background-color: #334155 !important;
+  color: #f8fafc !important;
+}
+.dark input, .dark select {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+  border-color: #475569 !important;
+}
+.dark .text-gray-900, .dark .text-gray-800, .dark .text-gray-700, .dark .text-gray-600 {
+  color: #cbd5e1 !important;
+}
+.dark .fc-theme-standard td, .dark .fc-theme-standard th {
+  border-color: #334155 !important;
+}
+.dark .fc-col-header-cell-cushion, .dark .fc-daygrid-day-number {
+  color: #f8fafc !important;
+}
+
+/* 다크 모드일 때 이벤트 텍스트 색상(White) 및 어두운 배경색 변경 */
+.dark .fc-event,
+.dark .fc-event * {
+  color: #ffffff !important; /* 다크 모드: 흰색 */
+}
+.dark .vacation-equipment {
+  background-color: #991b1b !important; /* 다크 모드용 딥 레드 */
+  border-color: #b91c1c !important;
+}
+.dark .vacation-picking {
+  background-color: #1e40af !important; /* 다크 모드용 딥 블루 */
+  border-color: #1d4ed8 !important;
+}
+.dark .vacation-admin {
+  background-color: #6b21a8 !important; /* 다크 모드용 딥 퍼플 */
+  border-color: #7e22ce !important;
+}

@@ -5,90 +5,96 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>휴가 관리 시스템</title>
   
-  <!-- Tailwind CSS -->
+  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- FullCalendar v6 -->
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+    }
+  </script>
+
+  <!-- FullCalendar v6 CDN -->
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
 
-  <style>
-    /* 12. 직무별 휴가 표시 배경색 설정 */
-    .vacation-equipment {
-      background-color: #fecaca !important; /* 옅은 빨간색 */
-      border-color: #fca5a5 !important;
-      color: #991b1b !important;
-      font-weight: 600;
-      padding: 2px 4px;
-      border-radius: 4px;
-    }
-    .vacation-picking {
-      background-color: #bfdbfe !important; /* 옅은 파란색 */
-      border-color: #93c5fd !important;
-      color: #1e40af !important;
-      font-weight: 600;
-      padding: 2px 4px;
-      border-radius: 4px;
-    }
-    /* FullCalendar 일요일/토요일 색상 설정 */
-    .fc-day-sun a { color: red; }
-    .fc-day-sat a { color: blue; }
-  </style>
+  <!-- External CSS -->
+  <link rel="stylesheet" href="style.css">
 </head>
-<body class="bg-gray-100 text-gray-800 min-h-screen flex flex-col">
+<body class="bg-gray-100 text-gray-800 min-h-screen flex flex-col transition-colors duration-200">
 
-  <!-- 4. 처음 접속 시 안내 페이지 (온보딩) -->
+  <!-- 온보딩 모달 -->
   <div id="welcome-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-8 text-center space-y-6">
       <div class="text-blue-600 text-5xl">📅</div>
-      <h1 class="text-3xl font-extrabold text-gray-900">휴가 관리 시스템에 오신 것을 환영합니다!</h1>
-      <p class="text-gray-600 leading-relaxed text-sm">
+      <h1 class="text-3xl font-extrabold text-gray-900">휴가 관리 시스템</h1>
+      <p class="text-gray-600 leading-relaxed text-sm text-left bg-gray-50 p-4 rounded-xl">
         본 시스템은 팀원 간의 휴가 일정을 월 단위 달력으로 투명하게 공유하고 관리하기 위한 서비스입니다.<br><br>
         <strong>[주요 기능]</strong><br>
         • 최초 접속 시 전화번호/이름/비밀번호로 회원가입<br>
-        • 직무([장비], [피킹]) 및 그룹 선택<br>
+        • 직무([장비], [피킹], [관리자]) 및 그룹 선택<br>
         • 달력의 원하는 날짜 <u>터치(클릭)</u>로 휴가 등록/취소<br>
-        • 직무별 색상 구분 ([장비]: 옅은 빨강, [피킹]: 옅은 파랑)
+        • 직무별 색상 구분 ([장비]: 빨강, [피킹]: 파랑, [관리자]: 보라)
       </p>
-      <button onclick="closeWelcomeModal()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl transition duration-200 shadow-lg">
+      <button id="btn-close-welcome" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl transition duration-200 shadow-lg">
         시작하기 (로그인 / 회원가입)
       </button>
     </div>
   </div>
 
   <!-- 상단 네비게이션 바 -->
-  <nav class="bg-white shadow-md border-b">
+  <nav class="bg-white shadow-md border-b sticky top-0 z-30">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
       <div class="flex items-center space-x-3">
         <span class="text-2xl">🗓️</span>
         <span class="text-xl font-bold text-gray-900">휴가 관리 시스템</span>
       </div>
-      <div id="auth-buttons" class="flex gap-2">
-        <button onclick="openModal('login-modal')" class="px-4 py-2 text-sm font-semibold text-blue-600 hover:bg-blue-50 rounded-lg border border-blue-600">로그인</button>
-        <button onclick="openModal('register-modal')" class="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg">회원가입</button>
-      </div>
-      <div id="user-menu" class="hidden flex items-center space-x-4">
-        <span id="user-info-text" class="text-sm font-medium text-gray-700"></span>
-        <button onclick="openMyPage()" class="px-3 py-1.5 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md border">마이페이지</button>
-        <button id="admin-menu-btn" onclick="openAdminModal()" class="hidden px-3 py-1.5 text-xs font-semibold text-purple-700 bg-purple-100 hover:bg-purple-200 rounded-md border border-purple-300">관리자 메뉴</button>
-        <button onclick="logout()" class="px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 rounded-md">로그아웃</button>
+
+      <div class="flex items-center space-x-3">
+        <button id="btn-theme-toggle" class="px-3 py-1.5 text-xs font-semibold rounded-lg border bg-gray-50 hover:bg-gray-100 transition">
+          <span id="theme-icon">🌙</span> <span id="theme-text">야간 모드</span>
+        </button>
+
+        <div id="auth-buttons" class="flex gap-2">
+          <button id="btn-open-login" class="px-4 py-2 text-sm font-semibold text-blue-600 hover:bg-blue-50 rounded-lg border border-blue-600 transition">로그인</button>
+          <button id="btn-open-register" class="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition">회원가입</button>
+        </div>
+
+        <div id="user-menu" class="hidden flex items-center space-x-2 sm:space-x-3">
+          <span id="user-info-text" class="text-xs sm:text-sm font-medium text-gray-700"></span>
+          <button id="btn-open-mypage" class="px-3 py-1.5 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md border transition">마이페이지</button>
+
+          <div id="user-filter-container" class="hidden flex items-center space-x-1 bg-gray-50 px-2 py-1 rounded border">
+            <input type="checkbox" id="my-vacation-only" class="w-3.5 h-3.5 text-blue-600 rounded">
+            <label for="my-vacation-only" class="text-xs font-medium cursor-pointer select-none">내 휴가만 보기</label>
+          </div>
+
+          <div id="admin-filter-container" class="hidden">
+            <select id="admin-user-filter" class="text-xs px-2 py-1.5 border rounded-md bg-gray-50 font-medium">
+              <option value="ALL">전체 사용자 보기</option>
+            </select>
+          </div>
+
+          <button id="btn-open-admin" class="hidden px-3 py-1.5 text-xs font-semibold text-purple-700 bg-purple-100 hover:bg-purple-200 rounded-md border border-purple-300 transition">관리자 메뉴</button>
+          <button id="btn-logout" class="px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 rounded-md transition">로그아웃</button>
+        </div>
       </div>
     </div>
   </nav>
 
-  <!-- 2, 3. 월 단위 달력 화면 -->
+  <!-- 메인 달력 -->
   <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6">
-    <div class="bg-white p-6 rounded-2xl shadow-md border border-gray-200">
+    <div class="bg-white p-4 sm:p-6 rounded-2xl shadow-md border border-gray-200">
       <div id="calendar"></div>
     </div>
   </main>
 
-  <!-- 5, 6, 7. 회원가입 모달 -->
+  <!-- 회원가입 모달 -->
   <div id="register-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-40 flex items-center justify-center p-4">
     <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
       <h2 class="text-xl font-bold border-b pb-2">회원가입</h2>
-      <form id="register-form" onsubmit="handleRegister(event)" class="space-y-3">
+      <form id="register-form" class="space-y-3">
         <div>
           <label class="block text-xs font-semibold text-gray-600 mb-1">전화번호 (- 제외 숫자만)</label>
-          <input type="tel" id="reg-phone" required placeholder="01012345678" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">
+          <input type="tel" id="reg-phone" required placeholder="01012345678" pattern="[0-9]+" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">
         </div>
         <div>
           <label class="block text-xs font-semibold text-gray-600 mb-1">이름</label>
@@ -98,34 +104,31 @@
           <label class="block text-xs font-semibold text-gray-600 mb-1">비밀번호</label>
           <input type="password" id="reg-password" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">
         </div>
-        <!-- 6. 직무 선택 드롭다운 -->
         <div>
           <label class="block text-xs font-semibold text-gray-600 mb-1">직무 선택</label>
           <select id="reg-job" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">
             <option value="장비">장비</option>
             <option value="피킹">피킹</option>
+            <option value="관리자">관리자</option>
           </select>
         </div>
-        <!-- 7. 그룹 선택 드롭다운 -->
         <div>
           <label class="block text-xs font-semibold text-gray-600 mb-1">그룹 선택</label>
-          <select id="reg-group" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">
-            <!-- JS로 그룹 목록 로드 -->
-          </select>
+          <select id="reg-group" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"></select>
         </div>
         <div class="flex justify-end space-x-2 pt-2">
-          <button type="button" onclick="closeModal('register-modal')" class="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">취소</button>
+          <button type="button" data-target="register-modal" class="btn-close-modal px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">취소</button>
           <button type="submit" class="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700">가입하기</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- 로그인 모달 (18번 요구사항: 비밀번호 초기화 버튼 추가) -->
+  <!-- 로그인 모달 -->
   <div id="login-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-40 flex items-center justify-center p-4">
     <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 space-y-4">
       <h2 class="text-xl font-bold border-b pb-2">로그인</h2>
-      <form id="login-form" onsubmit="handleLogin(event)" class="space-y-3">
+      <form id="login-form" class="space-y-3">
         <div>
           <label class="block text-xs font-semibold text-gray-600 mb-1">아이디 / 전화번호</label>
           <input type="text" id="login-id" required placeholder="전화번호 또는 admin" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">
@@ -135,10 +138,9 @@
           <input type="password" id="login-password" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">
         </div>
         <div class="flex justify-between items-center pt-2">
-          <!-- 18. 비밀번호 초기화 버튼 -->
-          <button type="button" onclick="resetPasswordOnLogin()" class="text-xs text-blue-600 hover:underline">비밀번호 초기화</button>
+          <button type="button" id="btn-reset-password-login" class="text-xs text-blue-600 hover:underline">비밀번호 초기화</button>
           <div class="space-x-2">
-            <button type="button" onclick="closeModal('login-modal')" class="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">취소</button>
+            <button type="button" data-target="login-modal" class="btn-close-modal px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">취소</button>
             <button type="submit" class="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700">로그인</button>
           </div>
         </div>
@@ -146,26 +148,24 @@
     </div>
   </div>
 
-  <!-- 10, 11. 휴가 등록/취소 터치/클릭 팝업 모달 -->
+  <!-- 휴가 등록/취소 모달 -->
   <div id="vacation-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-40 flex items-center justify-center p-4">
     <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 space-y-4">
       <h3 id="vacation-modal-date" class="text-lg font-bold border-b pb-2 text-gray-800"></h3>
-      <p class="text-sm text-gray-600">선택한 날짜에 휴가를 등록하거나 취소하시겠습니까?</p>
+      <p class="text-sm text-gray-600">선택한 날짜에 휴가를 등록하거나 기존 등록된 휴가를 취소할 수 있습니다.</p>
       <div class="flex justify-end space-x-2 pt-2">
-        <button onclick="closeModal('vacation-modal')" class="px-3 py-2 text-xs text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">닫기</button>
-        <!-- 11. 취소 버튼 -->
-        <button onclick="cancelVacation()" class="px-4 py-2 text-xs text-white bg-red-500 rounded-lg hover:bg-red-600">휴가 취소</button>
-        <!-- 10. 등록 버튼 -->
-        <button onclick="applyVacation()" class="px-4 py-2 text-xs text-white bg-blue-600 rounded-lg hover:bg-blue-700">휴가 등록</button>
+        <button type="button" data-target="vacation-modal" class="btn-close-modal px-3 py-2 text-xs text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">닫기</button>
+        <button type="button" id="btn-vacation-cancel" class="px-4 py-2 text-xs text-white bg-red-500 rounded-lg hover:bg-red-600">휴가 취소</button>
+        <button type="button" id="btn-vacation-apply" class="px-4 py-2 text-xs text-white bg-blue-600 rounded-lg hover:bg-blue-700">휴가 등록</button>
       </div>
     </div>
   </div>
 
-  <!-- 16, 17. 마이페이지 모달 -->
+  <!-- 마이페이지 모달 -->
   <div id="mypage-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-40 flex items-center justify-center p-4">
     <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
       <h2 class="text-xl font-bold border-b pb-2">마이페이지</h2>
-      <form id="mypage-form" onsubmit="handleUpdateProfile(event)" class="space-y-3">
+      <form id="mypage-form" class="space-y-3">
         <div>
           <label class="block text-xs font-semibold text-gray-600 mb-1">이름</label>
           <input type="text" id="my-name" disabled class="w-full px-3 py-2 border rounded-lg bg-gray-100 text-sm">
@@ -179,19 +179,17 @@
           <select id="my-job" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">
             <option value="장비">장비</option>
             <option value="피킹">피킹</option>
+            <option value="관리자">관리자</option>
           </select>
         </div>
         <div>
           <label class="block text-xs font-semibold text-gray-600 mb-1">그룹 변경</label>
-          <select id="my-group" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">
-            <!-- JS로 로드 -->
-          </select>
+          <select id="my-group" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"></select>
         </div>
         <div class="flex justify-between items-center pt-2">
-          <!-- 17. 비밀번호 초기화 (핸드폰 번호와 동일하게) -->
-          <button type="button" onclick="resetMyPasswordToPhone()" class="text-xs text-red-500 hover:underline">비밀번호 초기화(핸드폰번호로)</button>
+          <button type="button" id="btn-reset-mypw" class="text-xs text-red-500 hover:underline">비밀번호 초기화(전화번호로)</button>
           <div class="space-x-2">
-            <button type="button" onclick="closeModal('mypage-modal')" class="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">닫기</button>
+            <button type="button" data-target="mypage-modal" class="btn-close-modal px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">닫기</button>
             <button type="submit" class="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700">정보 수정</button>
           </div>
         </div>
@@ -199,24 +197,22 @@
     </div>
   </div>
 
-  <!-- 8, 13, 14, 15, 19, 20. 관리자/그룹관리자 전용 모달 -->
+  <!-- 관리자 모달 -->
   <div id="admin-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-40 flex items-center justify-center p-4">
     <div class="bg-white rounded-xl shadow-xl max-w-4xl w-full p-6 space-y-6 max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center border-b pb-2">
         <h2 class="text-xl font-bold">관리자 패널</h2>
-        <button onclick="closeModal('admin-modal')" class="text-gray-500 hover:text-gray-700 text-lg">✕</button>
+        <button type="button" data-target="admin-modal" class="btn-close-modal text-gray-500 hover:text-gray-700 text-lg">✕</button>
       </div>
 
-      <!-- 8. admin 전용: 그룹 생성 -->
       <div id="admin-group-create-sec" class="bg-purple-50 p-4 rounded-xl space-y-2 hidden">
         <h3 class="text-sm font-bold text-purple-900">신규 그룹 생성 (admin 전용)</h3>
         <div class="flex gap-2">
           <input type="text" id="new-group-name" placeholder="새 그룹 이름 입력" class="flex-1 px-3 py-1.5 border rounded-lg text-sm">
-          <button onclick="createGroup()" class="px-4 py-1.5 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700">그룹 추가</button>
+          <button type="button" id="btn-create-group" class="px-4 py-1.5 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700">그룹 추가</button>
         </div>
       </div>
 
-      <!-- 14, 19, 20. 그룹원 정보 조회, 수정, 비밀번호 초기화, 삭제 -->
       <div class="space-y-3">
         <h3 class="text-sm font-bold text-gray-800">사용자 관리 목록</h3>
         <div class="overflow-x-auto">
@@ -231,462 +227,14 @@
                 <th class="p-2 border text-center">작업</th>
               </tr>
             </thead>
-            <tbody id="admin-user-table-body">
-              <!-- JS 로드 -->
-            </tbody>
+            <tbody id="admin-user-table-body"></tbody>
           </table>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Firebase Modular SDK -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { 
-      getFirestore, doc, setDoc, getDoc, updateDoc, deleteDoc, collection, getDocs, query, where 
-    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-    // -------------------------------------------------------------
-    // Firebase 설정 정보 (발급받으신 본인의 정보를 넣으세요)
-    // -------------------------------------------------------------
-    const firebaseConfig = {
-      apiKey: "AIzaSyDCWDPFyTPv2GZVIuUs6CXfFxxNIEEXXDU",
-      authDomain: "vacation-app-4fdc4.firebaseapp.com",
-      projectId: "vacation-app-4fdc4",
-      storageBucket: "vacation-app-4fdc4.firebasestorage.app",
-      messagingSenderId: "449859332219",
-      appId: "1:449859332219:web:cade4e12ee4c87c74d5ade"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-
-    // 전역 상태
-    let currentUser = null; // 현재 로그인한 사용자 객체
-    let calendar = null;
-    let selectedDateStr = null;
-
-    // DOM 전달용 전역 함수 등록
-    window.closeWelcomeModal = closeWelcomeModal;
-    window.openModal = openModal;
-    window.closeModal = closeModal;
-    window.handleRegister = handleRegister;
-    window.handleLogin = handleLogin;
-    window.logout = logout;
-    window.applyVacation = applyVacation;
-    window.cancelVacation = cancelVacation;
-    window.openMyPage = openMyPage;
-    window.handleUpdateProfile = handleUpdateProfile;
-    window.resetMyPasswordToPhone = resetMyPasswordToPhone;
-    window.resetPasswordOnLogin = resetPasswordOnLogin;
-    window.openAdminModal = openAdminModal;
-    window.createGroup = createGroup;
-    window.updateUserByAdmin = updateUserByAdmin;
-    window.resetUserPwByAdmin = resetUserPwByAdmin;
-    window.deleteUserByAdmin = deleteUserByAdmin;
-
-    // 페이지 로드 시 초기화
-    document.addEventListener('DOMContentLoaded', async () => {
-      initCalendar();
-      await loadGroupDropdowns();
-      await ensureAdminExists();
-    });
-
-    // 9. 최초 admin 계정 자동 생성 확인
-    async function ensureAdminExists() {
-      const adminRef = doc(db, "users", "admin");
-      const adminSnap = await getDoc(adminRef);
-      if (!adminSnap.exists()) {
-        await setDoc(adminRef, {
-          phone: "admin",
-          name: "최고관리자",
-          password: "admin",
-          job: "장비",
-          group: "전체",
-          role: "admin"
-        });
-      }
-      // 기본 그룹도 없으면 생성
-      const groupRef = doc(db, "groups", "A그룹");
-      const groupSnap = await getDoc(groupRef);
-      if (!groupSnap.exists()) {
-        await setDoc(groupRef, { name: "A그룹" });
-        await setDoc(doc(db, "groups", "B그룹"), { name: "B그룹" });
-      }
-    }
-
-    // 2, 3, 10. FullCalendar 생성 및 설정 (터치/클릭 이벤트로 적용)
-    function initCalendar() {
-      const calendarEl = document.getElementById('calendar');
-      calendar = new FullCalendar.Calendar(calendarEl, {
-        initialView: 'dayGridMonth',
-        locale: 'ko',
-        headerToolbar: {
-          left: 'prev,next today',
-          center: 'title',
-          right: ''
-        },
-        height: 'auto',
-        events: fetchVacations,
-        dateClick: function(info) {
-          if (!currentUser) {
-            alert('로그인 후 휴가를 등록할 수 있습니다.');
-            openModal('login-modal');
-            return;
-          }
-          selectedDateStr = info.dateStr;
-          document.getElementById('vacation-modal-date').innerText = `${selectedDateStr} 휴가 설정`;
-          openModal('vacation-modal');
-        }
-      });
-
-      calendar.render();
-    }
-
-    // Firestore에서 휴가 정보 가져오기
-    async function fetchVacations(fetchInfo, successCallback, failureCallback) {
-      try {
-        const querySnapshot = await getDocs(collection(db, "vacations"));
-        const events = [];
-        querySnapshot.forEach((docSnap) => {
-          const data = docSnap.data();
-          events.push({
-            id: docSnap.id,
-            title: `${data.userName} (${data.job})`,
-            start: data.date,
-            className: data.job === '장비' ? 'vacation-equipment' : 'vacation-picking'
-          });
-        });
-        successCallback(events);
-      } catch (err) {
-        console.error("휴가 로드 실패:", err);
-        failureCallback(err);
-      }
-    }
-
-    // 4. 안내 창 닫기
-    function closeWelcomeModal() {
-      document.getElementById('welcome-modal').classList.add('hidden');
-    }
-
-    // 모달 제어
-    function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
-    function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
-
-    // 그룹 목록 불러와서 드롭다운 갱신
-    async function loadGroupDropdowns() {
-      const snaps = await getDocs(collection(db, "groups"));
-      const groups = [];
-      snaps.forEach(doc => groups.push(doc.data().name));
-
-      const regGroupSelect = document.getElementById('reg-group');
-      const myGroupSelect = document.getElementById('my-group');
-      
-      regGroupSelect.innerHTML = groups.map(g => `<option value="${g}">${g}</option>`).join('');
-      myGroupSelect.innerHTML = groups.map(g => `<option value="${g}">${g}</option>`).join('');
-    }
-
-    // 5. 회원가입 핸들러
-    async function handleRegister(e) {
-      e.preventDefault();
-      const phone = document.getElementById('reg-phone').value.trim();
-      const name = document.getElementById('reg-name').value.trim();
-      const password = document.getElementById('reg-password').value.trim();
-      const job = document.getElementById('reg-job').value;
-      const group = document.getElementById('reg-group').value;
-
-      const userRef = doc(db, "users", phone);
-      const userSnap = await getDoc(userRef);
-
-      if (userSnap.exists()) {
-        alert('이미 등록된 전화번호입니다.');
-        return;
-      }
-
-      await setDoc(userRef, {
-        phone, name, password, job, group, role: 'user'
-      });
-
-      alert('회원가입이 완료되었습니다! 로그인해 주세요.');
-      closeModal('register-modal');
-      openModal('login-modal');
-    }
-
-    // 5, 9. 로그인 핸들러
-    async function handleLogin(e) {
-      e.preventDefault();
-      const id = document.getElementById('login-id').value.trim();
-      const password = document.getElementById('login-password').value.trim();
-
-      const userRef = doc(db, "users", id);
-      const userSnap = await getDoc(userRef);
-
-      if (!userSnap.exists() || userSnap.data().password !== password) {
-        alert('아이디(전화번호) 또는 비밀번호가 올바르지 않습니다.');
-        return;
-      }
-
-      currentUser = userSnap.data();
-      currentUser.id = id;
-
-      updateUIForLoggedInUser();
-      closeModal('login-modal');
-      alert(`${currentUser.name}님 환영합니다!`);
-    }
-
-    // 18. 로그인 화면에서 비밀번호 초기화
-    async function resetPasswordOnLogin() {
-      const phone = prompt("가입한 전화번호(- 제외)를 입력하세요:");
-      if (!phone) return;
-
-      const name = prompt("가입한 이름을 입력하세요:");
-      if (!name) return;
-
-      const userRef = doc(db, "users", phone.trim());
-      const userSnap = await getDoc(userRef);
-
-      if (!userSnap.exists() || userSnap.data().name !== name.trim()) {
-        alert("일치하는 회원 정보를 찾을 수 없습니다.");
-        return;
-      }
-
-      // 전화번호로 비밀번호 초기화
-      await updateDoc(userRef, { password: phone.trim() });
-      alert(`비밀번호가 초기화되었습니다.\n초기화된 비밀번호: ${phone.trim()}`);
-    }
-
-    function updateUIForLoggedInUser() {
-      document.getElementById('auth-buttons').classList.add('hidden');
-      document.getElementById('user-menu').classList.remove('hidden');
-      document.getElementById('user-info-text').innerText = `${currentUser.name} (${currentUser.group} / ${currentUser.job})`;
-
-      if (currentUser.role === 'admin' || currentUser.role === 'manager') {
-        document.getElementById('admin-menu-btn').classList.remove('hidden');
-      } else {
-        document.getElementById('admin-menu-btn').classList.add('hidden');
-      }
-    }
-
-    function logout() {
-      currentUser = null;
-      document.getElementById('auth-buttons').classList.remove('hidden');
-      document.getElementById('user-menu').classList.add('hidden');
-      alert('로그아웃 되었습니다.');
-    }
-
-    // 10. 휴가 등록
-    async function applyVacation() {
-      if (!selectedDateStr || !currentUser) return;
-
-      const docId = `${currentUser.id}_${selectedDateStr}`;
-      await setDoc(doc(db, "vacations", docId), {
-        userId: currentUser.id,
-        userName: currentUser.name,
-        job: currentUser.job,
-        group: currentUser.group,
-        date: selectedDateStr
-      });
-
-      alert(`${selectedDateStr} 휴가가 등록되었습니다.`);
-      closeModal('vacation-modal');
-      calendar.refetchEvents();
-    }
-
-    // 11. 휴가 취소
-    async function cancelVacation() {
-      if (!selectedDateStr || !currentUser) return;
-
-      const docId = `${currentUser.id}_${selectedDateStr}`;
-      const vacRef = doc(db, "vacations", docId);
-      const vacSnap = await getDoc(vacRef);
-
-      if (!vacSnap.exists()) {
-        alert('해당 날짜에 등록된 본인의 휴가가 없습니다.');
-        return;
-      }
-
-      await deleteDoc(vacRef);
-      alert(`${selectedDateStr} 휴가가 취소되었습니다.`);
-      closeModal('vacation-modal');
-      calendar.refetchEvents();
-    }
-
-    // 16. 마이페이지 열기
-    function openMyPage() {
-      if (!currentUser) return;
-      document.getElementById('my-name').value = currentUser.name;
-      document.getElementById('my-job').value = currentUser.job;
-      document.getElementById('my-group').value = currentUser.group;
-      document.getElementById('my-password').value = '';
-      openModal('mypage-modal');
-    }
-
-    // 16. 마이페이지 프로필 수정
-    async function handleUpdateProfile(e) {
-      e.preventDefault();
-      const newJob = document.getElementById('my-job').value;
-      const newGroup = document.getElementById('my-group').value;
-      const newPassword = document.getElementById('my-password').value.trim();
-
-      const updateData = { job: newJob, group: newGroup };
-      if (newPassword) updateData.password = newPassword;
-
-      await updateDoc(doc(db, "users", currentUser.id), updateData);
-      
-      currentUser.job = newJob;
-      currentUser.group = newGroup;
-      if (newPassword) currentUser.password = newPassword;
-
-      alert('정보가 수정되었습니다.');
-      updateUIForLoggedInUser();
-      closeModal('mypage-modal');
-      calendar.refetchEvents();
-    }
-
-    // 17. 비밀번호 초기화 (핸드폰 번호와 동일하게)
-    async function resetMyPasswordToPhone() {
-      if (currentUser.id === 'admin') {
-        alert('admin 계정은 이 기능을 사용할 수 없습니다.');
-        return;
-      }
-      if (confirm(`비밀번호를 핸드폰 번호(${currentUser.phone})로 초기화하시겠습니까?`)) {
-        await updateDoc(doc(db, "users", currentUser.id), { password: currentUser.phone });
-        currentUser.password = currentUser.phone;
-        alert('비밀번호가 핸드폰 번호로 초기화되었습니다.');
-        closeModal('mypage-modal');
-      }
-    }
-
-    // 8, 13, 14, 15, 19, 20. 관리자 모달 열기
-    async function openAdminModal() {
-      if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) return;
-
-      if (currentUser.role === 'admin') {
-        document.getElementById('admin-group-create-sec').classList.remove('hidden');
-      } else {
-        document.getElementById('admin-group-create-sec').classList.add('hidden');
-      }
-
-      await loadAdminUserTable();
-      openModal('admin-modal');
-    }
-
-    // 8. 신규 그룹 생성 (admin 전용)
-    async function createGroup() {
-      const groupName = document.getElementById('new-group-name').value.trim();
-      if (!groupName) return;
-
-      await setDoc(doc(db, "groups", groupName), { name: groupName });
-      alert(`[${groupName}] 그룹이 생성되었습니다.`);
-      document.getElementById('new-group-name').value = '';
-      await loadGroupDropdowns();
-    }
-
-    // 14, 19, 20. 관리자용 사용자 목록 로드
-    async function loadAdminUserTable() {
-      const tbody = document.getElementById('admin-user-table-body');
-      tbody.innerHTML = '';
-
-      let q;
-      if (currentUser.role === 'admin') {
-        q = query(collection(db, "users"));
-      } else {
-        q = query(collection(db, "users"), where("group", "==", currentUser.group));
-      }
-
-      const querySnapshot = await getDocs(q);
-      const groupsSnap = await getDocs(collection(db, "groups"));
-      const groupOptions = [];
-      groupsSnap.forEach(g => groupOptions.push(g.data().name));
-
-      querySnapshot.forEach((docSnap) => {
-        const u = docSnap.data();
-        const userId = docSnap.id;
-
-        const row = document.createElement('tr');
-        row.className = "border-b hover:bg-gray-50";
-
-        row.innerHTML = `
-          <td class="p-2 border font-medium">${u.name} (${userId})</td>
-          <td class="p-2 border">${u.phone || '-'}</td>
-          <td class="p-2 border">
-            <select id="job-${userId}" class="border rounded p-1 text-xs">
-              <option value="장비" ${u.job === '장비' ? 'selected' : ''}>장비</option>
-              <option value="피킹" ${u.job === '피킹' ? 'selected' : ''}>피킹</option>
-            </select>
-          </td>
-          <td class="p-2 border">
-            <select id="group-${userId}" ${currentUser.role !== 'admin' ? 'disabled' : ''} class="border rounded p-1 text-xs">
-              ${groupOptions.map(g => `<option value="${g}" ${u.group === g ? 'selected' : ''}>${g}</option>`).join('')}
-            </select>
-          </td>
-          <td class="p-2 border">
-            <select id="role-${userId}" ${currentUser.role !== 'admin' ? 'disabled' : ''} class="border rounded p-1 text-xs">
-              <option value="user" ${u.role === 'user' ? 'selected' : ''}>일반</option>
-              <option value="manager" ${u.role === 'manager' ? 'selected' : ''}>그룹 관리자</option>
-              <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>최고 관리자</option>
-            </select>
-          </td>
-          <td class="p-2 border text-center space-x-1">
-            <button onclick="updateUserByAdmin('${userId}')" class="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700">저장</button>
-            <!-- 19. 관리자 패널 PW 초기화 버튼 -->
-            <button onclick="resetUserPwByAdmin('${userId}', '${u.phone}')" class="px-2 py-1 bg-amber-500 text-white rounded text-xs hover:bg-amber-600">PW초기화</button>
-            <!-- 20. 관리자 패널 사용자 삭제 버튼 -->
-            <button onclick="deleteUserByAdmin('${userId}')" class="px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700">삭제</button>
-          </td>
-        `;
-        tbody.appendChild(row);
-      });
-    }
-
-    // 14, 15. 관리자에 의한 사용자 정보 수정 저장
-    async function updateUserByAdmin(targetUserId) {
-      const newJob = document.getElementById(`job-${targetUserId}`).value;
-      const newGroup = document.getElementById(`group-${targetUserId}`).value;
-      const newRole = document.getElementById(`role-${targetUserId}`).value;
-
-      await updateDoc(doc(db, "users", targetUserId), {
-        job: newJob,
-        group: newGroup,
-        role: newRole
-      });
-
-      alert('사용자 정보가 변경되었습니다.');
-      if (currentUser.id === targetUserId) {
-        currentUser.job = newJob;
-        currentUser.group = newGroup;
-        currentUser.role = newRole;
-        updateUIForLoggedInUser();
-      }
-      calendar.refetchEvents();
-    }
-
-    // 19. 관리자에 의한 비밀번호 초기화 (전화번호로 설정, admin은 본인 전화번호 기준)
-    async function resetUserPwByAdmin(targetUserId, userPhone) {
-      if (targetUserId === 'admin') {
-        alert('admin 계정의 비밀번호는 여기서 초기화할 수 없습니다.');
-        return;
-      }
-      const defaultPw = userPhone && userPhone !== '-' ? userPhone : '1234';
-      if (confirm(`[${targetUserId}] 이용자의 비밀번호를 '${defaultPw}'(으)로 초기화하시겠습니까?`)) {
-        await updateDoc(doc(db, "users", targetUserId), { password: defaultPw });
-        alert(`비밀번호가 '${defaultPw}'(으)로 초기화되었습니다.`);
-      }
-    }
-
-    // 20. 관리자에 의한 이용자 삭제
-    async function deleteUserByAdmin(targetUserId) {
-      if (targetUserId === 'admin') {
-        alert('admin 최고 관리자 계정은 삭제할 수 없습니다.');
-        return;
-      }
-      if (confirm(`정말로 [${targetUserId}] 이용자를 삭제하시겠습니까?\n삭제 후 복구할 수 없습니다.`)) {
-        await deleteDoc(doc(db, "users", targetUserId));
-        alert('이용자가 삭제되었습니다.');
-        await loadAdminUserTable();
-      }
-    }
-  </script>
+  <!-- External JS Module -->
+  <script type="module" src="script.js"></script>
 </body>
 </html>
